@@ -4,6 +4,16 @@ import numpy as np
 from PIL import Image
 import json
 import time
+import os
+import gdown
+
+# ── Download Model if Not Present ────────────────────────────
+MODEL_PATH = "model_final.keras"
+
+if not os.path.exists(MODEL_PATH):
+    with st.spinner("🔄 Downloading AI model... This may take a minute..."):
+        url = "https://drive.google.com/uc?id=1HWSYeLDrqyopquh0gcTlmvmbsC9zUI7p"
+        gdown.download(url, MODEL_PATH, quiet=False)
 
 st.set_page_config(
     page_title="CropGuard — Crop Disease Detection",
