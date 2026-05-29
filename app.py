@@ -1,5 +1,5 @@
 import streamlit as st
-import tensorflow as tf
+import onnxruntime as ort
 import numpy as np
 from PIL import Image
 import json
@@ -8,11 +8,11 @@ import os
 import gdown
 
 # ── Download Model if Not Present ────────────────────────────
-MODEL_PATH = "model_final.keras"
+MODEL_PATH = "cropguard_model.onnx"
 
 if not os.path.exists(MODEL_PATH):
     with st.spinner("🔄 Downloading AI model... This may take a minute..."):
-        url = "https://drive.google.com/uc?id=1HWSYeLDrqyopquh0gcTlmvmbsC9zUI7p"
+        url = "https://drive.google.com/uc?id=1S38XjoWaH7twd4mBIpLQTx_0A8d1e3ZC"
         gdown.download(url, MODEL_PATH, quiet=False)
 
 st.set_page_config(
@@ -502,14 +502,14 @@ div[class*="uploadedFile"] { display: none !important; }
 # ── Load Model ─────────────────────────────────────────────────
 @st.cache_resource
 def load_resources():
-    model = tf.keras.models.load_model("model_final.keras")
+    session = ort.InferenceSession(MODEL_PATH)
     with open("class_names.json") as f:
         class_names = json.load(f)
     with open("remedies.json") as f:
         remedies = json.load(f)
-    return model, class_names, remedies
+    return session, class_names, remedies
 
-model, class_names, remedies = load_resources()
+session, class_names, remedies = load_resources()
 
 # ── ANNOUNCEMENT BAR ────────────────────────────────────────────
 st.markdown("""
@@ -745,12 +745,15 @@ st.markdown('</div>', unsafe_allow_html=True)
 if uploaded_file and analyse:
     with st.spinner("🔬 Analysing your leaf image..."):
         time.sleep(0.5)
-        img_r = image.resize((224,224))
-        arr   = np.expand_dims(np.array(img_r)/255.0, axis=0)
-        preds = model.predict(arr, verbose=0)
-        idx   = np.argmax(preds[0])
-        conf  = preds[0][idx]*100
-        dname = class_names[idx]
+        img_r = image.resize((224, 224))
+        arr = np.array(img_r).astype(np.float32) / 255.0
+        arr = np.expand_dims(arr, axis=0)
+        input_name = session.get_inputs()[0].name
+        preds  = session.run(None, {input_name: arr})
+        output = preds[0][0]
+        idx    = np.argmax(output)
+        conf   = output[idx] * 100
+        dname  = class_names[idx]
         rem   = remedies.get(dname, "Please consult your local agricultural expert.")
         ddisp = dname.replace("___"," — ").replace("_"," ")
         ok    = "healthy" in dname.lower()
